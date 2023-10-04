@@ -1,0 +1,32 @@
+{
+  "name": "osmosis-cl-pool-alerts",
+  "version": "1.0.0",
+  "description": "Bot to notify of supercharged pool tick ranges",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jasbanza/osmosis-cl-pool-alerts.git"
+  },
+  "keywords": [
+    "bot",
+    "monitoring",
+    "telegram"
+  ],
+  "author": "jasbanza",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/jasbanza/osmosis-cl-pool-alerts/issues"
+  },
+  "homepage": "https://github.com/jasbanza/osmosis-cl-pool-alerts#readme",
+  "dependencies": {
+    "async-retry-handler": "^1.0.5",
+    "execute-periodically": "^1.0.5",
+    "js-console-log-colors": "^2.0.0",
+    "nodejs-run-osmosisd-command": "^1.0.1"
+  }
+}
