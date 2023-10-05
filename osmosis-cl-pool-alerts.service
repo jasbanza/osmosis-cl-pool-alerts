@@ -5,7 +5,7 @@ Description=osmosis-cl-pool-alerts
 ExecStart=/home/jason/.nvm/versions/node/v18.2.0/bin/node /home/jason/prod/osmosis-cl-pool-alerts/index.js
 Restart=always
 RestartSec=5
-User=nobody
+User=jason
 # Note Debian/Ubuntu uses 'nogroup', RHEL/Fedora uses 'nobody'
 Group=nogroup
 Environment=PATH=/usr/bin:/usr/local/bin

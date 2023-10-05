@@ -83,7 +83,8 @@ const qPool = async (poolId) => {
      * @param {Error} error - The error object representing the failure.
      */
     function onFailure(error) {
-      out.error("qPool operation failed:", error);
+      out.error("qPool operation failed:");
+      console.log(error);
       // Handle failure here if needed
     }
 

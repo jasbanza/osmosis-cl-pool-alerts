@@ -6,9 +6,6 @@ import executePeriodically from "execute-periodically"; // used for continuous p
 import { qPool } from "./functions/queries.js";
 
 const previousTickValues = {};
-const DEBUG_MODE = true;
-const SEND_TG_MSG = true;
-const POLLING_INTERVAL_MS = 10 * 1000;
 
 (async () => {
   for (const {
@@ -20,22 +17,29 @@ const POLLING_INTERVAL_MS = 10 * 1000;
     // pause to offset polling
 
     const phaseOffsetMS = Math.round(
-      POLLING_INTERVAL_MS / config.POOL_RANGE_TICK_THRESHOLDS.length
+      config.POLLING_INTERVAL_MS / config.POOL_RANGE_TICK_THRESHOLDS.length
     );
     await new Promise((resolve) => setTimeout(resolve, phaseOffsetMS));
   }
 })();
 
+/**
+ * Monitors a pool and checks if the current tick is within a certain threshold of the upper or lower tick.
+ * @param {Object} params - The parameters for the function.
+ * @param {number} params.poolId - The ID of the pool to monitor.
+ * @param {number} params.threshold - The threshold for the tick.
+ * @param {string} params.poolFriendlyName - The friendly name of the pool.
+ */
 function monitorPool({ poolId, threshold, poolFriendlyName }) {
   const msg = `Monitoring started: Pool #${poolId} (${poolFriendlyName}) [threshold = ${threshold}]`;
   out.command(msg);
-  if (SEND_TG_MSG) {
+  if (config.SEND_TG_BOTSTART_MSG) {
     doTelegramNotification(msg);
   }
 
   executePeriodically({
     debug: false,
-    intervalMS: POLLING_INTERVAL_MS,
+    intervalMS: config.POLLING_INTERVAL_MS,
     fn: qPool,
     args: [poolId],
     cbSuccess: (res) => {
@@ -45,76 +49,85 @@ function monitorPool({ poolId, threshold, poolFriendlyName }) {
       // Check if the previous tick value is defined for this pool
       if (previousTickValues[poolId] !== undefined) {
         // Calculate the difference between the current tick and the previous tick
-        const tickChange = Math.abs(current_tick - previousTickValues[poolId]);
+        const tickChange = current_tick - previousTickValues[poolId];
+        const absTickChange = Math.abs(tickChange);
+        const numTickRangeChanges = getNumRangeChanges({
+          tickA: current_tick,
+          tickB: previousTickValues[poolId],
+          tick_spacing,
+        });
+       
+        const { nearThreshold, nearUpperOrLower, upperTick, lowerTick } =
+          checkRange({
+            tick_spacing,
+            current_tick,
+            threshold,
+          });
 
-        if (tickChange > 0) {
-          if (tickChange > tick_spacing) {
-            out.debug(
-              `#### New Tick Range > Pool ${poolId} (${poolFriendlyName}) | tick: ${res.current_tick}| threshold: ${threshold}`
-            );
-          } else {
-            out.info(
-              `#### Tick Change > Pool ${poolId} | tick: ${res.current_tick}| threshold: ${threshold}`
-            );
+        if (numTickRangeChanges > 1) {
+          let msg = `<b>🆕 Pool ${poolId} has a new tick range!</b>\n\n`;
+          msg += `• New Range: ${lowerTick} to ${upperTick}\n`;
+          msg += `• Change: ${
+            tickChange > 0 ? "+" + tickChange : tickChange
+          } ticks`;
+          msg += `• Change: ${numTickRangeChanges} tick ranges`;
+
+          doTelegramNotification(msg);
+          if (config.DEBUG_MODE) {
+            out.debug(msg);
+          }
+        } else if (absTickChange > 0 && nearThreshold) {
+          let msg = `<b>⚠️ Pool ${poolId} is near ${nearUpperOrLower} threshold:</b>\n\n`;
+          msg += `• Range: ${lowerTick} to ${upperTick}\n\n`;
+          msg += `• Current Tick: ${current_tick}\n`;
+          msg += `• Alert Threshold: ${threshold} ticks`;
+
+          doTelegramNotification(msg);
+          if (config.DEBUG_MODE) {
+            out.debug(msg);
           }
         }
-
-        // const { nearThreshold, upper_tick, lower_tick } = checkRange({
-        //   tick_spacing,
-        //   current_tick,
-        //   threshold,
-        // });
-
-        const test = checkRange({
-          tick_spacing: 100,
-          current_tick: -14673411,
-          threshold: 2,
-        });
-
-        if (tickChange > tick_spacing) {
-          let msg = `<b>🆕 Pool ${poolId} has a new tick range!</b>\n\n`;
-          msg += `• New Range: ${lower_tick} to ${upper_tick}\n`;
-          msg += `• Change: ${tickChange} ticks`;
-
-          doTelegramNotification(msg);
-        } else if (tickChange > 0 && nearThreshold) {
-          let msg = `<b>⚠️ Pool ${poolId} is near threshold:</b>\n\n`;
-          msg += `• Range: ${lower_tick} to ${upper_tick}\n\n`;
-          msg += `• Current Tick: ${current_tick}\n`;
-          msg += `• Alert Threshold: ${threshold}%`;
-
-          doTelegramNotification(msg);
-        }
       }
-
       // Update the previous tick value for this pool
-      previousTickValues[poolId] = current_tick;
-      if (DEBUG_MODE) {
-        console.log(previousTickValues);
+      previousTickValues = { ...previousTickValues, [poolId]: current_tick };
+      if (config.DEBUG_MODE) {
+        if (!objectsAreEqual(tempHistoricalTickValues, previousTickValues)) {
+          out.debug("tick change:");
+          console.log(previousTickValues);
+        }
       }
     },
   });
 }
 
+/**
+ * Checks if the current tick is within a certain threshold of the upper or lower tick.
+ * @param {Object} params - The parameters for the function.
+ * @param {number} params.tick_spacing - The spacing between ticks.
+ * @param {number} params.current_tick - The current tick.
+ * @param {number} params.threshold - The threshold for the tick.
+ * @returns {Object} An object containing the results of the check.
+ */
 function checkRange({ tick_spacing, current_tick, threshold }) {
-  const positionInRange = tick_spacing + (current_tick % tick_spacing);
-
-  const upper_tick = current_tick - (current_tick % tick_spacing);
-  const lower_tick = upper_tick - tick_spacing;
-
-  let nearThreshold = false;
-  if (
-    positionInRange <= threshold ||
-    positionInRange >= tick_spacing - threshold
-  ) {
-    nearThreshold = true;
+  // Calculate the lower tick by rounding down to the nearest multiple of tick_spacing
+  const lowerTick = Math.floor(current_tick / tick_spacing) * tick_spacing;
+  // The upper tick is always one tick_spacing above the lower tick
+  const upperTick = lowerTick + tick_spacing;
+  // Check if the current tick is within the threshold of the upper or lower tick
+  let nearUpperOrLower;
+  if (current_tick <= lowerTick + threshold) {
+    nearUpperOrLower = "lower";
+  } else if (current_tick >= upperTick - threshold) {
+    nearUpperOrLower = "upper";
   }
-
-  return { nearThreshold, upper_tick, lower_tick };
+  // Check if the current tick is near the threshold of the upper or lower tick
+  const nearThreshold = Boolean(nearUpperOrLower);
+  // Return the results
+  return { nearThreshold, nearUpperOrLower, upperTick, lowerTick };
 }
 
 function doTelegramNotification(text = "", attempts = 1) {
-  if (!SEND_TG_MSG) {
+  if (!config.SEND_TG_MSG) {
     return;
   }
   const json_body = {
@@ -134,7 +147,7 @@ function doTelegramNotification(text = "", attempts = 1) {
   )
     .then((res) => res.json())
     .then((json) => {
-      if (DEBUG_MODE) {
+      if (config.DEBUG_MODE) {
         console.log(json);
       }
     })
@@ -150,4 +163,32 @@ function doTelegramNotification(text = "", attempts = 1) {
         console.log(">>>>>>>>>> All attempts failed...");
       }
     });
+}
+
+/**
+ * Calculates the number of range changes between two ticks.
+ * @param {Object} params - The parameters for the function.
+ * @param {number} params.tickA - The first tick.
+ * @param {number} params.tickB - The second tick.
+ * @param {number} params.tick_spacing - The spacing between ticks.
+ * @returns {number} The number of range changes.
+ */
+function getNumRangeChanges({ tickA, tickB, tick_spacing }) {
+  // Calculate the absolute difference
+  const difference = Math.abs(tickA - tickB);
+
+  // Calculate the number of increments of tick_spacing needed to reach the target
+  const spaces = Math.floor(difference / tick_spacing);
+
+  return spaces;
+}
+
+/**
+ * Checks if two objects are equal.
+ * @param {Object} objA - The first object.
+ * @param {Object} objB - The second object.
+ * @returns {boolean} True if the objects are equal, false otherwise.
+ */
+function objectsAreEqual(objA, objB) {
+  return JSON.stringify(objA) === JSON.stringify(objB);
 }

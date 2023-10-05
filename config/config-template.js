@@ -6,4 +6,8 @@ export default {
   ],
   TG_BOT_KEY: "123456789BOTKEY123456789",
   TG_CHAT_ID: "-1234567890",
+  DEBUG_MODE: true,
+  SEND_TG_MSG: true,
+  SEND_TG_BOTSTART_MSG: false,
+  POLLING_INTERVAL_MS: 10 * 1000,
 };
