@@ -64,8 +64,8 @@ function monitorPool({ poolId, threshold, poolFriendlyName }) {
         if (numTickRangeChanges > 1) {
           let msg = `<b>🆕 Pool ${poolId} has a new tick range!</b>\n\n`;
           msg += `• New Range: ${lowerTick} to ${upperTick}\n`;
-          msg += `• Change: ${tickChange > 0 ? "+" + tickChange : tickChange
-            } ticks`;
+          msg += `• Change: ${tickChange > 0 ? " 📈 +" + tickChange : " 📉 " + tickChange
+            } ticks\n`;
           msg += `• Change: ${numTickRangeChanges} tick ranges`;
 
           doTelegramNotification(msg);
