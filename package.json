@@ -27,6 +27,7 @@
     "async-retry-handler": "^1.0.5",
     "execute-periodically": "^1.0.5",
     "js-console-log-colors": "^2.0.0",
+    "node-fetch": "^2.7.0",
     "nodejs-run-osmosisd-command": "^1.0.1"
   }
 }

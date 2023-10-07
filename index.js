@@ -2,10 +2,8 @@
 import config from "./config/config.js";
 import out from "js-console-log-colors"; // custom context colors for console logging by jasbanza
 import executePeriodically from "execute-periodically"; // used for continuous polling
-
-import { qPool } from "./functions/queries.js";
-
-const previousTickValues = {};
+import fetch from "node-fetch"; // used for fetching data from the LCD endpoint
+let previousTickValues = {};
 
 (async () => {
   for (const {
@@ -40,7 +38,7 @@ function monitorPool({ poolId, threshold, poolFriendlyName }) {
   executePeriodically({
     debug: false,
     intervalMS: config.POLLING_INTERVAL_MS,
-    fn: qPool,
+    fn: getPools,
     args: [poolId],
     cbSuccess: (res) => {
       const current_tick = parseInt(res.current_tick);
@@ -56,20 +54,18 @@ function monitorPool({ poolId, threshold, poolFriendlyName }) {
           tickB: previousTickValues[poolId],
           tick_spacing,
         });
-       
+
         const { nearThreshold, nearUpperOrLower, upperTick, lowerTick } =
           checkRange({
             tick_spacing,
             current_tick,
             threshold,
           });
-
         if (numTickRangeChanges > 1) {
           let msg = `<b>🆕 Pool ${poolId} has a new tick range!</b>\n\n`;
           msg += `• New Range: ${lowerTick} to ${upperTick}\n`;
-          msg += `• Change: ${
-            tickChange > 0 ? "+" + tickChange : tickChange
-          } ticks`;
+          msg += `• Change: ${tickChange > 0 ? "+" + tickChange : tickChange
+            } ticks`;
           msg += `• Change: ${numTickRangeChanges} tick ranges`;
 
           doTelegramNotification(msg);
@@ -91,13 +87,25 @@ function monitorPool({ poolId, threshold, poolFriendlyName }) {
       // Update the previous tick value for this pool
       previousTickValues = { ...previousTickValues, [poolId]: current_tick };
       if (config.DEBUG_MODE) {
-        if (!objectsAreEqual(tempHistoricalTickValues, previousTickValues)) {
-          out.debug("tick change:");
-          console.log(previousTickValues);
-        }
+        out.debug("previousTickValues:");
+        console.log(previousTickValues);
       }
     },
   });
+}
+
+async function getPools(poolId) {
+  try {
+    const response = await fetch(`https://lcd.osmosis.zone/osmosis/poolmanager/v1beta1/pools/${poolId}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+    // Process the response here
+    const data = await response.json();
+    return data.pool;
+  } catch (error) {
+    console.error('Fetch error:', error);
+  }
 }
 
 /**
