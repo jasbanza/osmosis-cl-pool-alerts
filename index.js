@@ -38,63 +38,70 @@ function monitorPool({ poolId, threshold, poolFriendlyName }) {
   executePeriodically({
     debug: false,
     intervalMS: config.POLLING_INTERVAL_MS,
-    fn: getPools,
+    fn: getPool,
     args: [poolId],
     cbSuccess: (res) => {
-      const current_tick = parseInt(res.current_tick);
-      const tick_spacing = parseInt(res.tick_spacing);
+      try {
 
-      // Check if the previous tick value is defined for this pool
-      if (previousTickValues[poolId] !== undefined) {
-        // Calculate the difference between the current tick and the previous tick
-        const tickChange = current_tick - previousTickValues[poolId];
-        const absTickChange = Math.abs(tickChange);
-        const numTickRangeChanges = getNumRangeChanges({
-          tickA: current_tick,
-          tickB: previousTickValues[poolId],
-          tick_spacing,
-        });
+        const current_tick = parseInt(res.current_tick);
+        const tick_spacing = parseInt(res.tick_spacing);
 
-        const { nearThreshold, nearUpperOrLower, upperTick, lowerTick } =
-          checkRange({
+
+        // Check if the previous tick value is defined for this pool
+        if (previousTickValues[poolId] !== undefined) {
+          // Calculate the difference between the current tick and the previous tick
+          const tickChange = current_tick - previousTickValues[poolId];
+          const absTickChange = Math.abs(tickChange);
+          const numTickRangeChanges = getNumRangeChanges({
+            tickA: current_tick,
+            tickB: previousTickValues[poolId],
             tick_spacing,
-            current_tick,
-            threshold,
           });
-        if (numTickRangeChanges > 1) {
-          let msg = `<b>🆕 Pool ${poolId} has a new tick range!</b>\n\n`;
-          msg += `• New Range: ${lowerTick} to ${upperTick}\n`;
-          msg += `• Change: ${tickChange > 0 ? " 📈 +" + tickChange : " 📉 " + tickChange
-            } ticks\n`;
-          msg += `• Change: ${numTickRangeChanges} tick ranges`;
 
-          doTelegramNotification(msg);
-          if (config.DEBUG_MODE) {
-            out.debug(msg);
-          }
-        } else if (absTickChange > 0 && nearThreshold) {
-          let msg = `<b>⚠️ Pool ${poolId} is near ${nearUpperOrLower} threshold:</b>\n\n`;
-          msg += `• Range: ${lowerTick} to ${upperTick}\n\n`;
-          msg += `• Current Tick: ${current_tick}\n`;
-          msg += `• Alert Threshold: ${threshold} ticks`;
+          const { nearThreshold, nearUpperOrLower, upperTick, lowerTick } =
+            checkRange({
+              tick_spacing,
+              current_tick,
+              threshold,
+            });
+          if (numTickRangeChanges > 1) {
+            let msg = `<b>🆕 Pool ${poolId} has a new tick range!</b>\n\n`;
+            msg += `• New Range: ${lowerTick} to ${upperTick}\n`;
+            msg += `• Change: ${tickChange > 0 ? " 📈 +" + tickChange : " 📉 " + tickChange
+              } ticks\n`;
+            msg += `• Change: ${numTickRangeChanges} tick ranges`;
 
-          doTelegramNotification(msg);
-          if (config.DEBUG_MODE) {
-            out.debug(msg);
+            doTelegramNotification(msg);
+            if (config.DEBUG_MODE) {
+              out.debug(msg);
+            }
+          } else if (absTickChange > 0 && nearThreshold) {
+            let msg = `<b>⚠️ Pool ${poolId} is near ${nearUpperOrLower} threshold:</b>\n\n`;
+            msg += `• Range: ${lowerTick} to ${upperTick}\n\n`;
+            msg += `• Current Tick: ${current_tick}\n`;
+            msg += `• Alert Threshold: ${threshold} ticks`;
+
+            doTelegramNotification(msg);
+            if (config.DEBUG_MODE) {
+              out.debug(msg);
+            }
           }
         }
-      }
-      // Update the previous tick value for this pool
-      previousTickValues = { ...previousTickValues, [poolId]: current_tick };
-      if (config.DEBUG_MODE) {
-        out.debug("previousTickValues:");
-        console.log(previousTickValues);
+        // Update the previous tick value for this pool
+        previousTickValues = { ...previousTickValues, [poolId]: current_tick };
+        if (config.DEBUG_MODE) {
+          out.debug("previousTickValues:");
+          console.log(previousTickValues);
+        }
+
+      } catch (error) {
+        console.error('Fetch error:', error);
       }
     },
   });
 }
 
-async function getPools(poolId) {
+async function getPool(poolId) {
   try {
     const response = await fetch(`https://lcd.osmosis.zone/osmosis/poolmanager/v1beta1/pools/${poolId}`);
     if (!response.ok) {
