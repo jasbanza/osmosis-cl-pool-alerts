@@ -10,8 +10,9 @@ let previousTickValues = {};
     poolId,
     threshold,
     poolFriendlyName,
+    telegramChatId
   } of config.POOL_RANGE_TICK_THRESHOLDS) {
-    monitorPool({ poolId, threshold, poolFriendlyName });
+    monitorPool({ poolId, threshold, poolFriendlyName, telegramChatId });
     // pause to offset polling
 
     const phaseOffsetMS = Math.round(
@@ -28,11 +29,11 @@ let previousTickValues = {};
  * @param {number} params.threshold - The threshold for the tick.
  * @param {string} params.poolFriendlyName - The friendly name of the pool.
  */
-function monitorPool({ poolId, threshold, poolFriendlyName }) {
-  const msg = `Monitoring started: Pool #${poolId} (${poolFriendlyName}) [threshold = ${threshold}]`;
-  out.command(msg);
-  if (config.SEND_TG_BOTSTART_MSG) {
-    doTelegramNotification(msg);
+function monitorPool({ poolId, threshold, poolFriendlyName, telegramChatId }) {
+  let text = `Monitoring started: Pool #${poolId} (${poolFriendlyName}) [threshold = ${threshold}]`;
+  out.command(text);
+  if (config.SEND_TG_BOTSTART_text) {
+    doTelegramNotification({ text: text, chatId: telegramChatId });
   }
 
   executePeriodically({
@@ -65,26 +66,26 @@ function monitorPool({ poolId, threshold, poolFriendlyName }) {
               threshold,
             });
           if (numTickRangeChanges > 1) {
-            let msg = `<b>🆕 Pool ${poolId} has a new tick range!</b>\n\n`;
-            msg += `• Current Tick: ${current_tick}\n`;
-            msg += `• New Range: ${lowerTick} to ${upperTick}\n`;
-            msg += `• Change: ${tickChange > 0 ? " 📈 +" + tickChange : " 📉 " + tickChange
+            let text = `<b>🆕 Pool ${poolId} has a new tick range!</b>\n\n`;
+            text += `• Current Tick: ${current_tick}\n`;
+            text += `• New Range: ${lowerTick} to ${upperTick}\n`;
+            text += `• Change: ${tickChange > 0 ? " 📈 +" + tickChange : " 📉 " + tickChange
               } ticks\n`;
-            msg += `• Change: ${numTickRangeChanges} tick ranges`;
+            text += `• Change: ${numTickRangeChanges} tick ranges`;
 
-            doTelegramNotification(msg);
+            doTelegramNotification({ text: text, chatId: telegramChatId });
             if (config.DEBUG_MODE) {
-              out.debug(msg);
+              out.debug(text);
             }
           } else if (absTickChange > 0 && nearThreshold) {
-            let msg = `<b>⚠️ Pool ${poolId} is near ${nearUpperOrLower} threshold:</b>\n\n`;
-            msg += `• Range: ${lowerTick} to ${upperTick}\n\n`;
-            msg += `• Current Tick: ${current_tick}\n`;
-            msg += `• Alert Threshold: ${threshold} ticks`;
+            let text = `<b>⚠️ Pool ${poolId} is near ${nearUpperOrLower} threshold:</b>\n\n`;
+            text += `• Range: ${lowerTick} to ${upperTick}\n\n`;
+            text += `• Current Tick: ${current_tick}\n`;
+            text += `• Alert Threshold: ${threshold} ticks`;
 
-            doTelegramNotification(msg);
+            doTelegramNotification({ text: text, chatId: telegramChatId });
             if (config.DEBUG_MODE) {
-              out.debug(msg);
+              out.debug(text);
             }
           }
         }
@@ -142,12 +143,12 @@ function checkRange({ tick_spacing, current_tick, threshold }) {
   return { nearThreshold, nearUpperOrLower, upperTick, lowerTick };
 }
 
-function doTelegramNotification(text = "", attempts = 1) {
-  if (!config.SEND_TG_MSG) {
+function doTelegramNotification({ text = "", attempts = 1, chatId }) {
+  if (!config.SEND_TG_text) {
     return;
   }
   const json_body = {
-    chat_id: config.TG_CHAT_ID,
+    chat_id: chatId,
     text: text,
   };
 
@@ -173,7 +174,7 @@ function doTelegramNotification(text = "", attempts = 1) {
       if (attempts <= 5) {
         console.log(`retrying attempt ${attempts} of 5 in 3 seconds...`);
         setTimeout(() => {
-          doTelegramNotification(text, attempts + 1);
+          doTelegramNotification({ text, attempts: attempts + 1, chatId });
         }, 5000);
       } else {
         console.log(">>>>>>>>>> All attempts failed...");
