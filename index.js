@@ -32,7 +32,7 @@ let previousTickValues = {};
 function monitorPool({ poolId, threshold, poolFriendlyName, telegramChatId }) {
   let text = `Monitoring started: Pool #${poolId} (${poolFriendlyName}) [threshold = ${threshold}]`;
   out.command(text);
-  if (config.SEND_TG_BOTSTART_text) {
+  if (config.SEND_TG_BOTSTART_MSG) {
     doTelegramNotification({ text: text, chatId: telegramChatId });
   }
 
