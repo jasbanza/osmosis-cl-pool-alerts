@@ -144,7 +144,7 @@ function checkRange({ tick_spacing, current_tick, threshold }) {
 }
 
 function doTelegramNotification({ text = "", attempts = 1, chatId }) {
-  if (!config.SEND_TG_text) {
+  if (!config.SEND_TG_MSG) {
     return;
   }
   const json_body = {
